@@ -37,6 +37,11 @@ Você receberá dois arquivos principais:
 - Você precisa **prever se cada passageiro sobreviveu**
 
 Explore os dados na aba **Data** da competição.
+## 🔧 Como usar este repositório
+
+1. Instale as dependências (pandas, scikit-learn, numpy).
+2. Execute `python main.py` para gerar o arquivo `submission.csv`.
+
 
 ---
 
