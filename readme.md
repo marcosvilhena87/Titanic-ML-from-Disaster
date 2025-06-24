@@ -45,6 +45,12 @@ Explore os dados na aba **Data** da competição.
    ```
 2. Execute `python main.py` para gerar o arquivo `submission.csv`.
 
+3. Caso possua envios anteriores, coloque arquivos `submission*.csv` na pasta
+   `submissions` e registre suas pontuações no `scores.csv` (formato
+   `Submission;Score`). O `main.py` carregará esses arquivos e combinará as
+   previsões ponderando cada uma pela pontuação informada, mas **não** alterará
+   esses arquivos.
+
 
 ---
 
