@@ -9,6 +9,12 @@ from sklearn.impute import SimpleImputer
 from sklearn.model_selection import cross_val_score
 
 
+def add_title_column(df):
+    """Extract honorific titles from the Name field."""
+    df['Title'] = df['Name'].str.extract(r',\s*([^\.]+)\.')
+    return df
+
+
 def load_data():
     train_path = 'data/train.csv'
     test_path = 'data/test.csv'
@@ -17,12 +23,14 @@ def load_data():
     return train_df, test_df
 
 
-def preprocess_data(train_df, test_df):
+def preprocess_data(train_df, test_df, include_title=False):
     y = train_df['Survived']
 
     for df in (train_df, test_df):
         df['FamilySize'] = df['SibSp'] + df['Parch'] + 1
         df['IsAlone'] = (df['FamilySize'] == 1).astype(int)
+        if include_title:
+            add_title_column(df)
 
     X = train_df.drop(['Survived', 'Name', 'Ticket', 'Cabin'], axis=1)
     X_test = test_df.drop(['Name', 'Ticket', 'Cabin'], axis=1)
@@ -36,6 +44,8 @@ def preprocess_data(train_df, test_df):
         'IsAlone',
     ]
     categorical_features = ['Pclass', 'Sex', 'Embarked']
+    if include_title:
+        categorical_features.append('Title')
 
     numeric_transformer = Pipeline(
         steps=[('imputer', SimpleImputer(strategy='median'))]
@@ -98,17 +108,23 @@ def save_submission(test_df, predictions, path='submission.csv'):
 
 def main():
     train_df, test_df = load_data()
-    X, y, X_test, clf = preprocess_data(train_df, test_df)
 
-    # estimate baseline performance via cross validation
-    baseline_score = cross_val_score(clf, X, y, cv=5).mean()
+    # baseline model without title feature
+    X_base, y_base, _, clf_base = preprocess_data(train_df.copy(), test_df.copy())
+    baseline_score = cross_val_score(clf_base, X_base, y_base, cv=5).mean()
+    print(f"Baseline accuracy (sem titulo): {baseline_score:.4f}")
+
+    # model with title feature
+    X, y, X_test, clf = preprocess_data(train_df, test_df, include_title=True)
+    title_score = cross_val_score(clf, X, y, cv=5).mean()
+    print(f"Accuracy com titulo: {title_score:.4f}")
 
     predictions, probabilities = train_and_predict(X, y, X_test, clf)
 
     submissions = load_previous_submissions()
     if submissions:
-        total_weight = baseline_score
-        weighted = baseline_score * probabilities
+        total_weight = title_score
+        weighted = title_score * probabilities
         for score, df in submissions:
             df = df.set_index('PassengerId').loc[test_df['PassengerId']]
             weighted += score * df['Survived']
