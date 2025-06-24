@@ -5,8 +5,10 @@ from sklearn.preprocessing import OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.model_selection import cross_val_score
+from joblib import dump
 
 
 def add_title_column(df):
@@ -23,7 +25,7 @@ def load_data():
     return train_df, test_df
 
 
-def preprocess_data(train_df, test_df, include_title=False):
+def preprocess_data(train_df, test_df, include_title=False, model_type="logistic"):
     y = train_df['Survived']
 
     for df in (train_df, test_df):
@@ -65,9 +67,18 @@ def preprocess_data(train_df, test_df, include_title=False):
         ]
     )
 
+    if model_type == "logistic":
+        classifier = LogisticRegression(max_iter=1000)
+    elif model_type == "random_forest":
+        classifier = RandomForestClassifier(n_estimators=200, random_state=0)
+    elif model_type == "gradient_boosting":
+        classifier = GradientBoostingClassifier(random_state=0)
+    else:
+        raise ValueError(f"Modelo desconhecido: {model_type}")
+
     clf = Pipeline(
         steps=[('preprocessor', preprocessor),
-               ('classifier', LogisticRegression(max_iter=1000))]
+               ('classifier', classifier)]
     )
 
     return X, y, X_test, clf
@@ -95,6 +106,11 @@ def load_previous_submissions():
     return submissions
 
 
+def save_model(model, path='best_model.pkl'):
+    """Persist trained model to disk."""
+    dump(model, path)
+
+
 def save_submission(test_df, predictions, path='submission.csv'):
     if isinstance(predictions, pd.Series):
         predictions = predictions.values
@@ -109,22 +125,30 @@ def save_submission(test_df, predictions, path='submission.csv'):
 def main():
     train_df, test_df = load_data()
 
-    # baseline model without title feature
-    X_base, y_base, _, clf_base = preprocess_data(train_df.copy(), test_df.copy())
-    baseline_score = cross_val_score(clf_base, X_base, y_base, cv=5).mean()
-    print(f"Baseline accuracy (sem titulo): {baseline_score:.4f}")
+    models = {
+        "logistic": "Regressão Logística",
+        "random_forest": "RandomForest",
+        "gradient_boosting": "GradientBoosting",
+    }
 
-    # model with title feature
-    X, y, X_test, clf = preprocess_data(train_df, test_df, include_title=True)
-    title_score = cross_val_score(clf, X, y, cv=5).mean()
-    print(f"Accuracy com titulo: {title_score:.4f}")
+    scores = {}
+    for m in models:
+        X, y, X_test, clf = preprocess_data(train_df.copy(), test_df.copy(), include_title=True, model_type=m)
+        score = cross_val_score(clf, X, y, cv=5).mean()
+        print(f"Acurácia {models[m]}: {score:.4f}")
+        scores[m] = score
 
-    predictions, probabilities = train_and_predict(X, y, X_test, clf)
+    best_type = max(scores, key=scores.get)
+    print(f"Melhor modelo: {models[best_type]} ({scores[best_type]:.4f})")
+
+    X, y, X_test, best_clf = preprocess_data(train_df, test_df, include_title=True, model_type=best_type)
+    predictions, probabilities = train_and_predict(X, y, X_test, best_clf)
+    save_model(best_clf)
 
     submissions = load_previous_submissions()
     if submissions:
-        total_weight = title_score
-        weighted = title_score * probabilities
+        total_weight = scores[best_type]
+        weighted = scores[best_type] * probabilities
         for score, df in submissions:
             df = df.set_index('PassengerId').loc[test_df['PassengerId']]
             weighted += score * df['Survived']
