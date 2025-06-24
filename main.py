@@ -1,6 +1,5 @@
 # Simple baseline model for Kaggle Titanic competition
 import os
-import glob
 import pandas as pd
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.compose import ColumnTransformer
