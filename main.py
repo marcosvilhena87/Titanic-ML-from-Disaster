@@ -7,7 +7,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.impute import SimpleImputer
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_val_score, GridSearchCV
 from joblib import dump
 
 
@@ -68,7 +68,7 @@ def preprocess_data(train_df, test_df, include_title=False, model_type="logistic
     )
 
     if model_type == "logistic":
-        classifier = LogisticRegression(max_iter=1000)
+        classifier = LogisticRegression(max_iter=1000, solver='liblinear')
     elif model_type == "random_forest":
         classifier = RandomForestClassifier(n_estimators=200, random_state=0)
     elif model_type == "gradient_boosting":
@@ -131,17 +131,36 @@ def main():
         "gradient_boosting": "GradientBoosting",
     }
 
+    # Dados processados uma única vez
+    X, y, X_test, _ = preprocess_data(train_df.copy(), test_df.copy(), include_title=True, model_type="logistic")
+
     scores = {}
-    for m in models:
-        X, y, X_test, clf = preprocess_data(train_df.copy(), test_df.copy(), include_title=True, model_type=m)
+    best_estimators = {}
+
+    # GridSearch para o modelo de Regressão Logística
+    _, _, _, log_clf = preprocess_data(train_df.copy(), test_df.copy(), include_title=True, model_type="logistic")
+    param_grid = {
+        'classifier__C': [0.1, 1, 10],
+        'classifier__penalty': ['l1', 'l2']
+    }
+    grid = GridSearchCV(log_clf, param_grid, cv=5)
+    grid.fit(X, y)
+    print(f"Acurácia {models['logistic']} (GridSearch): {grid.best_score_:.4f}")
+    scores['logistic'] = grid.best_score_
+    best_estimators['logistic'] = grid.best_estimator_
+
+    # Avalia os demais modelos
+    for m in ["random_forest", "gradient_boosting"]:
+        _, _, _, clf = preprocess_data(train_df.copy(), test_df.copy(), include_title=True, model_type=m)
         score = cross_val_score(clf, X, y, cv=5).mean()
         print(f"Acurácia {models[m]}: {score:.4f}")
         scores[m] = score
+        best_estimators[m] = clf
 
     best_type = max(scores, key=scores.get)
     print(f"Melhor modelo: {models[best_type]} ({scores[best_type]:.4f})")
 
-    X, y, X_test, best_clf = preprocess_data(train_df, test_df, include_title=True, model_type=best_type)
+    best_clf = best_estimators[best_type]
     predictions, probabilities = train_and_predict(X, y, X_test, best_clf)
     save_model(best_clf)
 
