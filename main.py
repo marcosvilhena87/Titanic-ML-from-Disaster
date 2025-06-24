@@ -19,10 +19,22 @@ def load_data():
 
 def preprocess_data(train_df, test_df):
     y = train_df['Survived']
+
+    for df in (train_df, test_df):
+        df['FamilySize'] = df['SibSp'] + df['Parch'] + 1
+        df['IsAlone'] = (df['FamilySize'] == 1).astype(int)
+
     X = train_df.drop(['Survived', 'Name', 'Ticket', 'Cabin'], axis=1)
     X_test = test_df.drop(['Name', 'Ticket', 'Cabin'], axis=1)
 
-    numeric_features = ['Age', 'SibSp', 'Parch', 'Fare']
+    numeric_features = [
+        'Age',
+        'SibSp',
+        'Parch',
+        'Fare',
+        'FamilySize',
+        'IsAlone',
+    ]
     categorical_features = ['Pclass', 'Sex', 'Embarked']
 
     numeric_transformer = Pipeline(
