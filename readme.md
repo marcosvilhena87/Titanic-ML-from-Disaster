@@ -39,7 +39,10 @@ Você receberá dois arquivos principais:
 Explore os dados na aba **Data** da competição.
 ## 🔧 Como usar este repositório
 
-1. Instale as dependências (pandas, scikit-learn, numpy).
+1. Instale as dependências listadas em `requirements.txt` com:
+   ```bash
+   pip install -r requirements.txt
+   ```
 2. Execute `python main.py` para gerar o arquivo `submission.csv`.
 
 
